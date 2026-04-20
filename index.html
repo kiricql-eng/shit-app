@@ -3,22 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHIFT.AI - シフト管理</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <title>SHIFT.AI</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body>
+<body style="margin:0;">
     <div id="root"></div>
 
     <script type="text/babel">
-        // ここに、私がさきほど作成した JavaScript のコードをすべて貼り付けます
-        // (App 関数や ShiftManager コンポーネントなど)
-        
         const { useState, useMemo, useEffect } = React;
-        
-        // --- [ここにコードを貼り付け] ---
 
+        // さきほど作成した「App」以降のコードをここに合体させています
+        function App() {
+            const [user, setUser] = useState(null);
+            const [staffAccounts, setStaffAccounts] = useState(() => {
+                const saved = localStorage.getItem("shift_staff_v2");
+                return saved ? JSON.parse(saved) : [
+                    { id: 1, loginId: "admin", password: "password123", name: "管理者", role: "admin", color: "#1e293b", hourlyWage: 2000 },
+                    { id: 2, loginId: "yamada", password: "password123", name: "山田 太郎", role: "staff", color: "#2563eb", hourlyWage: 1200 }
+                ];
+            });
+
+            useEffect(() => {
+                localStorage.setItem("shift_staff_v2", JSON.stringify(staffAccounts));
+            }, [staffAccounts]);
+
+            if (!user) return <LoginScreen staffAccounts={staffAccounts} onLogin={setUser} />;
+            return <ShiftManager user={user} setUser={setUser} staffAccounts={staffAccounts} setStaffAccounts={setStaffAccounts} onLogout={() => setUser(null)} />;
+        }
+
+        // --- 以下、管理画面のパーツを定義 ---
+        
+        function ShiftManager({ user, setUser, staffAccounts, setStaffAccounts, onLogout }) {
+            const [view, setView] = useState("shift");
+            const [monthShifts, setMonthShifts] = useState(() => {
+                const saved = localStorage.getItem("shifts_data_v2");
+                return saved ? JSON.parse(saved) : {};
+            });
+
+            useEffect(() => {
+                localStorage.setItem("shifts_data_v2", JSON.stringify(monthShifts));
+            }, [monthShifts]);
+
+            const handleUpdateMe = (newData) => {
+                setStaffAccounts(prev => prev.map(s => s.id === user.id ? { ...s, ...newData } : s));
+                setUser(prev => ({ ...prev, ...newData }));
+                alert("更新しました。");
+            };
+
+            return (
+                <div style={{ background: "#f1f5f9", minHeight: "100vh", fontFamily: "sans-serif" }}>
+                    <div style={{ background: "#fff", padding: "0 20px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e2e8f0" }}>
+                        <div style={{ fontWeight: 800, color: "#2563eb", fontSize: 20 }}>SHIFT.AI</div>
+                        <button onClick={onLogout} style={{ padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer" }}>ログアウト</button>
+                    </div>
+                    <div style={{ background: "#fff", display: "flex", gap: 10, padding: "0 20px", borderBottom: "1px solid #e2e8f0" }}>
+                        <button onClick={() => setView("shift")} style={{ padding: "15px", border: "none", background: "none", cursor: "pointer", fontWeight: 600 }}>シフト表</button>
+                        <button onClick={() => setView("config")} style={{ padding: "15px", border: "none", background: "none", cursor: "pointer", fontWeight: 600 }}>設定</button>
+                    </div>
+                    <div style={{ padding: 20 }}>
+                        {view === "shift" ? <h2>シフト画面 (表示中)</h2> : <MySettings user={user} onUpdate={handleUpdateMe} />}
+                        {user.role === "admin" && view === "config" && <AdminStaffManager staffAccounts={staffAccounts} setStaffAccounts={setStaffAccounts} />}
+                    </div>
+                </div>
+            );
+        }
+
+        function MySettings({ user, onUpdate }) {
+            const [name, setName] = useState(user.name);
+            const [pw, setPw] = useState(user.password);
+            return (
+                <div style={{ background: "#fff", padding: 20, borderRadius: 12, marginBottom: 20 }}>
+                    <h3>個人設定</h3>
+                    <input style={{ display: "block", marginBottom: 10, padding: 8 }} value={name} onChange={e => setName(e.target.value)} />
+                    <input style={{ display: "block", marginBottom: 10, padding: 8 }} type="password" value={pw} onChange={e => setPw(e.target.value)} />
+                    <button onClick={() => onUpdate({ name, password: pw })} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "10px 20px", borderRadius: 8 }}>保存</button>
+                </div>
+            );
+        }
+
+        function AdminStaffManager({ staffAccounts, setStaffAccounts }) {
+            return (
+                <div style={{ background: "#fff", padding: 20, borderRadius: 12 }}>
+                    <h3>スタッフ管理</h3>
+                    {staffAccounts.map(s => (
+                        <div key={s.id} style={{ marginBottom: 10, borderBottom: "1px solid #eee", paddingBottom: 5 }}>
+                            {s.name} (ID: {s.loginId})
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function LoginScreen({ staffAccounts, onLogin }) {
+            const [id, setId] = useState("");
+            const [pw, setPw] = useState("");
+            const handle = () => {
+                const s = staffAccounts.find(x => x.loginId === id && x.password === pw);
+                if (s) onLogin(s);
+                else alert("ログイン失敗");
+            };
+            return (
+                <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#e2e8f0" }}>
+                    <div style={{ background: "#fff", padding: 40, borderRadius: 20, width: 300 }}>
+                        <h2 style={{ textAlign: "center", color: "#2563eb" }}>SHIFT.AI</h2>
+                        <input placeholder="ID" style={{ width: "100%", marginBottom: 15, padding: 10 }} onChange={e => setId(e.target.value)} />
+                        <input placeholder="PW" type="password" style={{ width: "100%", marginBottom: 20, padding: 10 }} onChange={e => setPw(e.target.value)} />
+                        <button onClick={handle} style={{ width: "100%", padding: 10, background: "#2563eb", color: "#fff", border: "none", borderRadius: 8 }}>ログイン</button>
+                    </div>
+                </div>
+            );
+        }
+
+        // 画面に描画
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
